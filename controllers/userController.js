@@ -4,31 +4,50 @@ exports.login = (req, res)=> {
     let user = new User(req.body)
     user.login().then((result)=> {
         req.session.user = {username: user.data.username}
-        res.send(result)
+        req.session.save(()=> {
+            res.redirect('/')
+        })
     })
     .catch((err)=>{
-        res.send(err)
+        req.flash('errors', err)
+        // req.session.flash.errors =[err]
+        req.session.save(()=> {
+            res.redirect('/')
+        })
     })
 }
 
-exports.logout = ()=> {
-    
+exports.logout = (req, res)=> {
+    req.session.destroy(()=>{
+        res.redirect('/')
+    })
+
 }
 
 exports.register = (req, res)=> {
     let user = new User(req.body)
     user.register()
-    if(user.errors.length > 0) {
-        res.send(user.errors)
-    }else{
-        res.send("Register completed.")
-    }
+    .then(()=> {
+        req.session.user ={username: user.data.username}
+        req.session.save(()=> {
+            res.redirect('/')
+        })
+    })
+    .catch((regErrors) => {
+        regErrors.forEach(function(err) {
+            req.flash('regErrors', err)
+        })
+        req.session.save(()=> {
+            res.redirect('/')
+        })
+    })
+
 }
 
 exports.home = (req, res)=> {
     if (req.session.user) {
-        res.send("meow you are in meow kitty")
+        res.render("home-dashboard", {username: req.session.user.username})
     } else {
-        res.render('home-guest')
+        res.render('home-guest', {errors: req.flash('errors'), regErrors: req.flash('regErrors')})
     }
 }
