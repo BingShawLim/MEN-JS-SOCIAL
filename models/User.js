@@ -3,9 +3,11 @@ const userCollection = require('../db').db().collection('user')
 const validator = require('validator')
 const md5 = require('md5')
 
-let User = function(data) {
+let User = function(data, getAvatar) {
     this.data = data
     this.errors = []
+    if(getAvatar == undefined){getAvatar = false}
+    if(getAvatar){this.getAvatar()}
 }
 
 User.prototype.cleanUp = function () {
@@ -85,6 +87,30 @@ User.prototype.register = function() {
         
         }
     )
+}
+
+User.findByUsername = function(username) {
+    return new Promise((resolve,reject) => {
+        if(typeof(username) != 'string') {
+            reject()
+            return
+        }
+        userCollection.findOne({username: username}).then(function(userDoc){
+            if (userDoc) {
+                userDoc = new User(userDoc, true)
+                userDoc = {
+                    _id: userDoc.data._id,
+                    username: userDoc.data.username,
+                    avatar: userDoc.avatar
+                }
+                resolve(userDoc)
+            } else {
+                reject()
+            }
+        }).catch(() => {
+            reject()
+        })
+    })
 }
 
 module.exports = User
