@@ -2,6 +2,19 @@ const User = require('../models/User')
 const Post = require('../models/Post')
 const Follow = require('../models/Follow')
 
+exports.doesUsernameExist = function (req, res) {
+    User.findByUsername(req.body.username).then(() => {
+        res.json(true)
+    }).catch(() => {
+        res.json(false)
+    })
+}
+
+exports.doesEmailExist = async function (req, res) {
+    let emailBool = await User.doesEmailExist(req.body.email)
+    res.json(emailBool)
+}
+
 exports.login = (req, res)=> {
     let user = new User(req.body)
     user.login().then((result)=> {
@@ -102,6 +115,7 @@ exports.sharedProfileData = async function(req, res, next) {
 exports.profilePostsScreen = function(req, res) {
     Post.findByAuthorId(req.profileUser._id).then((posts)=>{
         res.render('profile', {
+            title: `${req.profileUser.username}'s profile`,
             currentPage: "posts",
             posts: posts,
             username:req.profileUser.username,
