@@ -1,42 +1,18 @@
 const User = require('../models/User')
 const Post = require('../models/Post')
 const Follow = require('../models/Follow')
+const jwt = require('jsonwebtoken')
 
-exports.doesUsernameExist = function (req, res) {
-    User.findByUsername(req.body.username).then(() => {
-        res.json(true)
-    }).catch(() => {
-        res.json(false)
-    })
-}
-
-exports.doesEmailExist = async function (req, res) {
-    let emailBool = await User.doesEmailExist(req.body.email)
-    res.json(emailBool)
-}
-
-exports.login = (req, res)=> {
-    let user = new User(req.body)
-    user.login().then((result)=> {
-        req.session.user = {avatar: user.avatar, username: user.data.username, _id: user.data._id}
-        req.session.save(()=> {
-            res.redirect('/')
+exports.home = async (req, res)=> {
+    if (req.session.user) {
+        //fetch posts
+        let posts = await Post.getFeed(req.session.user._id)
+        res.render("home-dashboard", {
+            posts : posts
         })
-    })
-    .catch((err)=>{
-        req.flash('errors', err)
-        // req.session.flash.errors =[err]
-        req.session.save(()=> {
-            res.redirect('/')
-        })
-    })
-}
-
-exports.logout = (req, res)=> {
-    req.session.destroy(()=>{
-        res.redirect('/')
-    })
-
+    } else {
+        res.render('home-guest', {regErrors: req.flash('regErrors')})
+    }
 }
 
 exports.register = (req, res)=> {
@@ -58,7 +34,42 @@ exports.register = (req, res)=> {
     })
 
 }
+//Login functions
+exports.login = (req, res)=> {
+    let user = new User(req.body)
+    user.login().then((result)=> {
+        req.session.user = {avatar: user.avatar, username: user.data.username, _id: user.data._id}
+        req.session.save(()=> {
+            res.redirect('/')
+        })
+    })
+    .catch((err)=>{
+        req.flash('errors', err)
+        // req.session.flash.errors =[err]
+        req.session.save(()=> {
+            res.redirect('/')
+        })
+    })
+}
 
+exports.apiLogin = (req, res)=> {
+    let user = new User(req.body)
+    user.login().then((result)=> {
+        res.json(jwt.sign({_id: user.data._id},process.env.JWTSECRET, {expiresIn: '3d'}))
+    })
+    .catch((err)=>{
+        res.json("fake")
+    })
+}
+//logout
+exports.logout = (req, res)=> {
+    req.session.destroy(()=>{
+        res.redirect('/')
+    })
+
+}
+
+//validate logged in
 exports.mustBeLoggedIn = function(req, res, next) {
     if (req.session.user) {
         next()
@@ -70,16 +81,26 @@ exports.mustBeLoggedIn = function(req, res, next) {
     }
 }
 
-exports.home = async (req, res)=> {
-    if (req.session.user) {
-        //fetch posts
-        let posts = await Post.getFeed(req.session.user._id)
-        res.render("home-dashboard", {
-            posts : posts
-        })
-    } else {
-        res.render('home-guest', {regErrors: req.flash('regErrors')})
+exports.apiMustBeLoggedIn = function (req, res, next) {
+    try { 
+        req.apiUser = jwt.verify(req.body.token, process.env.JWTSECRET)
+        next()
+    } catch {
+        res.json("Sorry, you must provide a valid token.")
     }
+}
+
+exports.doesUsernameExist = function (req, res) {
+    User.findByUsername(req.body.username).then(() => {
+        res.json(true)
+    }).catch(() => {
+        res.json(false)
+    })
+}
+
+exports.doesEmailExist = async function (req, res) {
+    let emailBool = await User.doesEmailExist(req.body.email)
+    res.json(emailBool)
 }
 
 exports.ifUserExists= function(req, res, next) {
@@ -160,5 +181,15 @@ exports.profileFollowingScreen = async function (req, res) {
         })
     } catch {
         res.render("404")
+    }
+}
+
+exports.apiGetPostsByUsername = async function (req, res) {
+    try {
+        let authorDoc = await User.findByUsername(req.params.username)
+        let posts = await Post.findByAuthorId(authorDoc._id)
+        res.json(posts)
+     } catch {
+        res.json("Sorry, invalid user requested.")
     }
 }
